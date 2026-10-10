@@ -1,9 +1,13 @@
 // オフライン対応: ネットワーク優先、失敗時にキャッシュ
-const CACHE = "morse-v2";
+const CACHE = "morse-v3";
 const FILES = ["./", "index.html", "style.css", "app.js", "morse.js", "manifest.json", "icons/icon.svg"];
-self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))));
+self.addEventListener("install", (e) => {
+  self.skipWaiting(); // 新版を待たせず即有効化
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)));
+});
 self.addEventListener("activate", (e) => e.waitUntil(
-  caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k))))));
+  caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    .then(() => self.clients.claim())));
 self.addEventListener("fetch", (e) => e.respondWith(
   fetch(e.request).then((res) => {
     const copy = res.clone();
