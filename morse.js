@@ -12,7 +12,7 @@ export const MORSE = {
 export const LEARN_ORDER = "KMRSUAPTLOWINJEFYVGQZHBXCD".split("");
 
 export class MorsePlayer {
-  constructor() { this.ctx = null; this.timers = []; }
+  constructor() { this.ctx = null; this.timers = []; this.tone = null; }
 
   ensureContext() {
     if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -20,6 +20,29 @@ export class MorsePlayer {
   }
 
   stop() { this.timers.forEach(clearTimeout); this.timers = []; }
+
+  // 打鍵用: 押している間だけ鳴り続けるトーン
+  toneOn(freq) {
+    this.ensureContext();
+    this.toneOff();
+    const osc = this.ctx.createOscillator(), gain = this.ctx.createGain(), t = this.ctx.currentTime;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.4, t + 0.005);
+    osc.connect(gain).connect(this.ctx.destination);
+    osc.start(t);
+    this.tone = { osc, gain };
+  }
+
+  toneOff() {
+    if (!this.tone) return;
+    const { osc, gain } = this.tone, t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(gain.gain.value, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.01);
+    osc.stop(t + 0.02);
+    this.tone = null;
+  }
 
   // onElement(index, symbol, "on"|"off") を音と同期して呼ぶ。完了時 onDone。
   play(code, { wpm = 15, freq = 600 }, onElement, onDone) {

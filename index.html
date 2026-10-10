@@ -18,6 +18,11 @@
       <button id="reset" class="link">リセット</button></div>
   </header>
 
+  <nav class="modes">
+    <button id="modeListen" class="seg on">聞き取り<span class="en">Listen</span></button>
+    <button id="modeKey" class="seg">打鍵<span class="en">Keying</span></button>
+  </nav>
+
   <section class="board">
     <div class="hud">
       <span>TARGET <b id="target">?</b></span>
@@ -47,10 +52,16 @@
 
   <section id="keys" class="keys" aria-label="回答 Answer"></section>
 
+  <section id="keyPad" class="keypad" hidden>
+    <button id="key" class="keybtn" aria-label="打鍵 Tap key">打鍵 TAP<span class="en">短く=ト dit / 長押し=ツー dah</span></button>
+    <button id="keyClear" class="secondary">入力を消す Clear</button>
+  </section>
+
   <details>
     <summary>設定 Settings</summary>
     <label>速度 Speed <span id="wpmLabel"></span><input id="wpm" type="range" min="5" max="30"></label>
     <label>音の高さ Pitch <span id="freqLabel"></span><input id="freq" type="range" min="400" max="900" step="50"></label>
+    <label>練習ステップ Step <select id="step"></select></label>
     <label>練習する文字数 Letters to practice <span id="levelLabel"></span><input id="level" type="range" min="2" max="26"></label>
     <label class="row"><input id="visual" type="checkbox"> 視覚表示 Visual cues(光・ト/ツー glow, dit/dah)</label>
   </details>

@@ -53,3 +53,14 @@ h1 .en { font-size:.6em; letter-spacing:.05em; }
 .stats { text-align:right; }
 h1 { white-space:nowrap; font-size:1.05rem; }
 .result { white-space:pre-line; font-size:1.05rem; }
+.modes { display:flex; gap:8px; }
+.seg { flex:1; padding:10px; }
+.seg.on { background:var(--acc); color:#0f172a; font-weight:700; }
+.keypad { display:flex; flex-direction:column; gap:10px; }
+.keybtn { height:140px; font-size:1.6rem; font-weight:700; letter-spacing:.1em; background:linear-gradient(#27415a,#1b2f44);
+  border:2px solid #38bdf8; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.keybtn .en { letter-spacing:0; }
+.keybtn.down { background:var(--acc); color:#0f172a; box-shadow:0 0 24px var(--acc); }
+select { font:inherit; padding:10px; border-radius:8px; background:#0f172a; color:var(--fg); border:1px solid #334155; }
+input[type=range]:disabled { opacity:.35; }
+.hint { white-space:pre-line; }
