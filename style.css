@@ -25,7 +25,7 @@ h1 { font-size:1.2rem; margin:0; }
 .edge { fill:none; stroke:#334155; stroke-width:1.5; }
 .edge.lit { stroke:var(--acc); filter:url(#glow); }
 .node shape, .node .shp { fill:#0b1220; stroke:#64748b; stroke-width:1.5; }
-.node text { fill:#cbd5e1; font:700 11px system-ui,sans-serif; text-anchor:middle; dominant-baseline:central; }
+.node text { fill:#cbd5e1; font:700 22px system-ui,sans-serif; text-anchor:middle; dominant-baseline:central; }
 .node.off { opacity:.3; }
 .node.lit .shp { stroke:var(--acc); fill:#0c3a52; filter:url(#glow); }
 .node.lit text { fill:#fff; }

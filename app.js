@@ -25,7 +25,7 @@ const activeChars = () => LEARN_ORDER.slice(0, settings.level);
 
 // ---- モールス符号ツリー(点=左、線=右の二分木。英字のみ) ----
 const SVGNS = "http://www.w3.org/2000/svg";
-const ROW_Y = [14, 70, 126, 182, 238];
+const ROW_Y = [14, 72, 130, 188, 246];
 const letterByCode = {};
 for (const [ch, code] of Object.entries(MORSE)) if (/[A-Z]/.test(ch)) letterByCode[code] = ch;
 const els = {}; // code -> { edge, node }
@@ -44,7 +44,7 @@ function buildTree() {
     if (code && !letterByCode[code]) return;
     walk(code + "."); order.push(code); walk(code + "-");
   })("");
-  const PAD = 18, step = (384 - PAD * 2) / (order.length - 1);
+  const PAD = 15, step = (384 - PAD * 2) / (order.length - 1);
   const pos = {};
   // 最下段は線(-)で終わる文字を一段下げて、隣と重ならないようにする
   order.forEach((c, i) => { pos[c] = { x: PAD + i * step, y: ROW_Y[c.length] + (c.length === 4 && c.endsWith("-") ? 24 : 0) }; });
@@ -63,8 +63,8 @@ function buildTree() {
     if (code === "") {
       svg("circle", { class: "shp", cx: c.x, cy: c.y, r: 3.5 }, node);
     } else {
-      if (code.endsWith(".")) svg("circle", { class: "shp", cx: c.x, cy: c.y, r: 11 }, node);
-      else svg("rect", { class: "shp", x: c.x - 12, y: c.y - 10, width: 24, height: 20, rx: 5 }, node);
+      if (code.endsWith(".")) svg("circle", { class: "shp", cx: c.x, cy: c.y, r: 13 }, node);
+      else svg("rect", { class: "shp", x: c.x - 13, y: c.y - 12, width: 26, height: 24, rx: 6 }, node);
       svg("text", { x: c.x, y: c.y }, node).textContent = letterByCode[code];
     }
     els[code] = { edge, node, ch: letterByCode[code] };
