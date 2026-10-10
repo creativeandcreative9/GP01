@@ -129,7 +129,7 @@ function play() {
     if (state === "on") {
       lightPath(code, i + 1, true);
       $("trace").textContent = [...code.slice(0, i + 1)].map((s) => (s === "." ? "·" : "–")).join(" ");
-      $("sym").textContent = sym === "." ? "ト" : "ツー";
+      $("sym").textContent = sym === "." ? "ト dit" : "ツー dah";
     } else {
       els[code.slice(0, i + 1)].node.classList.remove("now");
       $("sym").textContent = "";
@@ -159,7 +159,7 @@ function answer(ch, btn) {
   if (ok) { stats.correct++; stats.streak++; } else { stats.streak = 0; }
   btn.classList.add(ok ? "ok" : "ng");
   if (!ok) document.querySelector(`#keys [data-ch="${current}"]`).classList.add("ok");
-  $("result").textContent = ok ? "正解!" : `不正解… 正解は ${current}`;
+  $("result").textContent = ok ? "正解! Correct!" : `不正解… 正解は ${current}\nWrong — answer: ${current}`;
   $("target").textContent = current;
   $("lampOk").className = "lamp" + (ok ? " ok" : "");
   $("lampNg").className = "lamp" + (ok ? "" : " ng");
@@ -168,7 +168,7 @@ function answer(ch, btn) {
   lightPath(code, code.length, false);
   els[code].node.classList.add("target");
   $("trace").textContent = [...code].map((s) => (s === "." ? "·" : "–")).join(" ");
-  $("hint").textContent = [...code].map((s) => (s === "." ? "ト" : "ツー")).join(" ");
+  $("hint").textContent = [...code].map((s) => (s === "." ? "ト" : "ツー")).join(" ") + "  (" + [...code].map((s) => (s === "." ? "dit" : "dah")).join(" ") + ")";
   $("next").hidden = false;
   renderStats();
   save();
@@ -184,7 +184,7 @@ function bindSetting(id, key, parse, labelId, fmt) {
 }
 bindSetting("wpm", "wpm", (e) => +e.value, "wpmLabel", (v) => `${v} WPM`);
 bindSetting("freq", "freq", (e) => +e.value, "freqLabel", (v) => `${v} Hz`);
-bindSetting("level", "level", (e) => +e.value, "levelLabel", (v) => `${v}文字: ${LEARN_ORDER.slice(0, v).join(" ")}`);
+bindSetting("level", "level", (e) => +e.value, "levelLabel", (v) => `${v}文字 letters: ${LEARN_ORDER.slice(0, v).join(" ")}`);
 $("level").addEventListener("change", () => { renderKeys(); refreshTreeLevel(); current = null; $("start").hidden = false; });
 $("visual").checked = settings.visual;
 $("visual").addEventListener("change", (e) => { settings.visual = e.target.checked; save(); });

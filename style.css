@@ -12,7 +12,7 @@ h1 { font-size:1.2rem; margin:0; }
 .hud { display:flex; justify-content:space-between; font:600 .7rem ui-monospace,monospace; letter-spacing:.12em; color:var(--mute); padding:0 6px 6px; }
 .hud b { color:var(--fg); font-size:.9rem; }
 .trace { color:var(--acc); letter-spacing:.3em; min-width:5em; }
-.legend { position:absolute; top:34px; right:12px; font:.6rem ui-monospace,monospace; color:var(--mute); letter-spacing:.1em; z-index:1; }
+.legend { font:.6rem ui-monospace,monospace; color:var(--mute); letter-spacing:.05em; margin:2px 0 6px; }
 .legend i { display:inline-block; background:#64748b; margin:0 4px 0 6px; vertical-align:middle; }
 .lg-dot { width:8px; height:8px; border-radius:50%; } .lg-dash { width:14px; height:8px; border-radius:2px; }
 .lamps { position:absolute; top:34px; left:12px; display:flex; flex-direction:column; gap:8px; padding:8px 10px;
@@ -48,3 +48,8 @@ summary { cursor:pointer; }
 label { display:flex; flex-direction:column; gap:6px; margin-top:12px; font-size:.9rem; }
 label.row { flex-direction:row; align-items:center; }
 [hidden] { display:none !important; }
+.en { display:block; font-size:.7em; font-weight:400; opacity:.75; }
+h1 .en { font-size:.6em; letter-spacing:.05em; }
+.stats { text-align:right; }
+h1 { white-space:nowrap; font-size:1.05rem; }
+.result { white-space:pre-line; font-size:1.05rem; }

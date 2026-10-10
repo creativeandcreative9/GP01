@@ -7,13 +7,13 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg">
 <link rel="apple-touch-icon" href="icons/icon.svg">
-<title>モールス練習</title>
+<title>モールス練習 Morse Practice</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
   <header>
-    <h1>モールス練習</h1>
+    <h1>モールス練習<span class="en">Morse Practice</span></h1>
     <div class="stats">正解 <b id="score">0 / 0</b> 連続 <b id="streak">0</b>
       <button id="reset" class="link">リセット</button></div>
   </header>
@@ -24,35 +24,35 @@
       <span id="trace" class="trace"></span>
       <span>ATTEMPT <b id="attempt">01</b></span>
     </div>
-    <div class="legend"><i class="lg-dot"></i>SHORT <i class="lg-dash"></i>LONG</div>
     <div class="lamps">
       <div><span id="lampOk" class="lamp"></span>OK</div>
       <div><span id="lampNg" class="lamp"></span>NG</div>
     </div>
-    <svg id="tree" viewBox="0 0 384 276" role="img" aria-label="モールス符号ツリー">
+    <svg id="tree" viewBox="0 0 384 276" role="img" aria-label="モールス符号ツリー Morse code tree">
       <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
         <feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter></defs>
     </svg>
+    <div class="legend"><i class="lg-dot"></i>SHORT 短 · ト dit <i class="lg-dash"></i>LONG 長 · ツー dah</div>
     <div id="sym" class="sym"></div>
     <div id="hint" class="hint"></div>
     <div id="result" class="result" role="status"></div>
   </section>
 
-  <button id="start" class="primary">スタート</button>
+  <button id="start" class="primary">スタート<span class="en">Start</span></button>
   <div class="actions">
-    <button id="play" class="secondary">もう一度聞く</button>
-    <button id="next" class="primary" hidden>次へ</button>
+    <button id="play" class="secondary">もう一度聞く<span class="en">Listen again</span></button>
+    <button id="next" class="primary" hidden>次へ<span class="en">Next</span></button>
   </div>
 
-  <section id="keys" class="keys" aria-label="回答"></section>
+  <section id="keys" class="keys" aria-label="回答 Answer"></section>
 
   <details>
-    <summary>設定</summary>
-    <label>速度 <span id="wpmLabel"></span><input id="wpm" type="range" min="5" max="30"></label>
-    <label>音の高さ <span id="freqLabel"></span><input id="freq" type="range" min="400" max="900" step="50"></label>
-    <label>練習する文字数 <span id="levelLabel"></span><input id="level" type="range" min="2" max="26"></label>
-    <label class="row"><input id="visual" type="checkbox"> 視覚表示(光・ト/ツー)</label>
+    <summary>設定 Settings</summary>
+    <label>速度 Speed <span id="wpmLabel"></span><input id="wpm" type="range" min="5" max="30"></label>
+    <label>音の高さ Pitch <span id="freqLabel"></span><input id="freq" type="range" min="400" max="900" step="50"></label>
+    <label>練習する文字数 Letters to practice <span id="levelLabel"></span><input id="level" type="range" min="2" max="26"></label>
+    <label class="row"><input id="visual" type="checkbox"> 視覚表示 Visual cues(光・ト/ツー glow, dit/dah)</label>
   </details>
 </main>
 <script type="module" src="app.js"></script>
