@@ -18,9 +18,23 @@
       <button id="reset" class="link">リセット</button></div>
   </header>
 
-  <section class="stage">
-    <div id="flash" class="flash"><span id="sym"></span></div>
-    <div id="pattern" class="pattern" aria-live="off"></div>
+  <section class="board">
+    <div class="hud">
+      <span>TARGET <b id="target">?</b></span>
+      <span id="trace" class="trace"></span>
+      <span>ATTEMPT <b id="attempt">01</b></span>
+    </div>
+    <div class="legend"><i class="lg-dot"></i>SHORT <i class="lg-dash"></i>LONG</div>
+    <div class="lamps">
+      <div><span id="lampOk" class="lamp"></span>OK</div>
+      <div><span id="lampNg" class="lamp"></span>NG</div>
+    </div>
+    <svg id="tree" viewBox="0 0 384 276" role="img" aria-label="モールス符号ツリー">
+      <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter></defs>
+    </svg>
+    <div id="sym" class="sym"></div>
     <div id="hint" class="hint"></div>
     <div id="result" class="result" role="status"></div>
   </section>
@@ -37,7 +51,7 @@
     <summary>設定</summary>
     <label>速度 <span id="wpmLabel"></span><input id="wpm" type="range" min="5" max="30"></label>
     <label>音の高さ <span id="freqLabel"></span><input id="freq" type="range" min="400" max="900" step="50"></label>
-    <label>練習する文字数 <span id="levelLabel"></span><input id="level" type="range" min="2" max="36"></label>
+    <label>練習する文字数 <span id="levelLabel"></span><input id="level" type="range" min="2" max="26"></label>
     <label class="row"><input id="visual" type="checkbox"> 視覚表示(光・ト/ツー)</label>
   </details>
 </main>

@@ -8,8 +8,8 @@ export const MORSE = {
   5: ".....", 6: "-....", 7: "--...", 8: "---..", 9: "----.",
 };
 
-// Koch法に近い習得順(段階的に文字を増やす)
-export const LEARN_ORDER = "KMRSUAPTLOWINJEF0YVG5Q9ZH38B427C1D6X".split("");
+// Koch法に近い習得順(段階的に文字を増やす。数字は除外)
+export const LEARN_ORDER = "KMRSUAPTLOWINJEFYVGQZHBXCD".split("");
 
 export class MorsePlayer {
   constructor() { this.ctx = null; this.timers = []; }
