@@ -53,7 +53,8 @@ h1 .en { font-size:.6em; letter-spacing:.05em; }
 .stats { text-align:right; }
 h1 { white-space:nowrap; font-size:1.05rem; }
 .result { white-space:pre-line; font-size:1.05rem; }
-.modes { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.modes { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
+.seg { grid-column:span 2; } .seg:nth-child(n+4) { grid-column:span 3; } /* 上段=聞き取り3つ、下段=打鍵2つ */
 .seg { padding:8px 2px; font-size:.72rem; white-space:nowrap; }
 .seg.on { background:var(--acc); color:#0f172a; font-weight:700; }
 .keypad { display:flex; flex-direction:column; gap:10px; }

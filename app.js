@@ -1,17 +1,19 @@
 import { MORSE, LEARN_ORDER, MorsePlayer } from "./morse.js";
 import { MUSE_PHRASES } from "./muse.js";
+import { FLOW_PHRASES } from "./flow.js";
 
 const $ = (id) => document.getElementById(id);
 const player = new MorsePlayer();
 // ステップ練習: 各ステップで追加される文字(累積して練習する)
 const STEPS = ["KM", "R", "S", "I", "A", "P", "T", "L", "O"];
-const DEFAULTS = { wpm: 15, freq: 600, level: 6, visual: true, step: 0, mode: "listen", museIndex: 0 };
+const DEFAULTS = { wpm: 15, freq: 600, level: 6, visual: true, step: 0, mode: "listen", museIndex: 0, flowIndex: 0 };
 const settings = { ...DEFAULTS, ...load("settings") };
 settings.level = Math.min(settings.level, LEARN_ORDER.length);
 if (!(settings.step >= 0 && settings.step <= STEPS.length)) settings.step = 0;
-const MODE_BTN = { listen: "modeListen", key: "modeKey", free: "modeFree", muse: "modeMuse" };
+const MODE_BTN = { listen: "modeListen", flow: "modeFlow", muse: "modeMuse", key: "modeKey", free: "modeFree" };
 if (!(settings.mode in MODE_BTN)) settings.mode = "listen";
 settings.museIndex = Math.min(MUSE_PHRASES.length - 1, Math.max(0, Math.floor(+settings.museIndex) || 0));
+settings.flowIndex = Math.min(FLOW_PHRASES.length - 1, Math.max(0, Math.floor(+settings.flowIndex) || 0));
 const stats = { correct: 0, total: 0, streak: 0, ...load("stats") };
 
 let current = null;   // 出題中の文字
@@ -21,9 +23,9 @@ let input = "";       // 打鍵モードの入力中の符号
 let pressAt = 0;      // 打鍵ボタンを押し始めた時刻(0=押していない)
 let commitTimer = null;
 let spaceTimer = null;  // フリー打鍵: 自動スペース用
-let freeText = "";      // フリー打鍵: 確定済みの文字列
-let museTok = 0;        // MUSE: 世代番号(古いタイマー/コールバックを無効化)
-let museTimer = null;
+let freeText = "";      // フリー打鍵/FLOW: 確定済みの文字列
+let playTok = 0;        // MUSE/FLOW: 世代番号(古いタイマー/コールバックを無効化)
+let playTimer = null;
 let musePaused = false;
 
 function load(key) {
@@ -94,7 +96,7 @@ function buildTree() {
 }
 
 function refreshTreeLevel() {
-  const act = new Set(activeChars()), all = settings.mode === "free" || settings.mode === "muse"; // 全文字を使うモードは減光しない
+  const act = new Set(activeChars()), all = ["free", "muse", "flow"].includes(settings.mode); // 全文字を使うモードは減光しない
   for (const code in els) if (els[code].ch) els[code].node.classList.toggle("off", !all && !act.has(els[code].ch));
 }
 
@@ -119,14 +121,15 @@ function lightPath(code, n, now) {
 
 function renderHud() {
   const m = settings.mode;
-  $("targetLabel").textContent = m === "free" ? "LAST" : m === "muse" ? "PHRASE" : "TARGET";
-  $("attemptLabel").textContent = m === "free" ? "CHARS" : m === "muse" ? "OF" : "ATTEMPT";
+  const seq = m === "muse" || m === "flow"; // フレーズ番号を出すモード
+  $("targetLabel").textContent = m === "free" ? "LAST" : seq ? "PHRASE" : "TARGET";
+  $("attemptLabel").textContent = m === "free" ? "CHARS" : seq ? "OF" : "ATTEMPT";
   if (m === "free") {
     $("target").textContent = freeText.trim().slice(-1) || "-";
     $("attempt").textContent = String(freeText.length).padStart(2, "0");
-  } else if (m === "muse") {
-    $("target").textContent = String(settings.museIndex + 1).padStart(2, "0");
-    $("attempt").textContent = MUSE_PHRASES.length;
+  } else if (seq) {
+    $("target").textContent = String((m === "muse" ? settings.museIndex : settings.flowIndex) + 1).padStart(2, "0");
+    $("attempt").textContent = (m === "muse" ? MUSE_PHRASES : FLOW_PHRASES).length;
   } else $("attempt").textContent = String(stats.total + (answered ? 0 : 1)).padStart(2, "0");
 }
 
@@ -191,24 +194,28 @@ function next() {
   if (settings.mode === "listen") play();
 }
 
-// 判定の共通処理(聞き取り・打鍵の両方)
-function finish(ok, typed) {
+// 判定の共通処理(集計・ランプ・保存は score、聞き取り・打鍵の表示は finish)
+function score(ok) {
   answered = true;
   stats.total++;
   if (ok) { stats.correct++; stats.streak++; } else { stats.streak = 0; }
-  const code = MORSE[current];
   $("result").textContent = ok ? "正解! Correct!" : `不正解… 正解は ${current}\nWrong — answer: ${current}`;
-  $("target").textContent = current;
   $("lampOk").className = "lamp" + (ok ? " ok" : "");
   $("lampNg").className = "lamp" + (ok ? "" : " ng");
+  $("next").hidden = false;
+  renderStats();
+  save();
+}
+
+function finish(ok, typed) {
+  score(ok);
+  const code = MORSE[current];
+  $("target").textContent = current;
   clearTree();
   lightPath(code, code.length, false);
   els[code].node.classList.add("target");
   $("trace").textContent = fmtSyms(code);
   $("hint").textContent = `${fmtKana(code)} (${fmtEn(code)})` + (typed && !ok ? `\n入力 You: ${fmtSyms(typed)}` : "");
-  $("next").hidden = false;
-  renderStats();
-  save();
 }
 
 function answer(ch, btn) {
@@ -223,13 +230,13 @@ function answer(ch, btn) {
 const unitMs = () => 1200 / settings.wpm;
 
 function keyDown() {
-  const free = settings.mode === "free";
-  if (pressAt || !(free || (settings.mode === "key" && current && !answered && !playing))) return;
+  const m = settings.mode, free = m === "free" || m === "flow";
+  if (pressAt || !(m === "free" || ((m === "key" || m === "flow") && current && !answered && !playing))) return;
   clearTimeout(commitTimer);
   clearTimeout(spaceTimer);
   if (free && !input) clearTree(); // 前の文字の点灯を消す
+  player.toneOn(settings.freq); // 初回のAudioContext生成時間を押下時間に含めない
   pressAt = performance.now();
-  player.toneOn(settings.freq);
   $("key").classList.add("down");
 }
 
@@ -244,7 +251,7 @@ function keyUp() {
   lightPath(input, input.length, true);
   $("trace").textContent = fmtSyms(input);
   $("sym").textContent = sym === "." ? "ト dit" : "ツー dah";
-  if (settings.mode === "free") {
+  if (settings.mode === "free" || settings.mode === "flow") {
     commitTimer = setTimeout(commitFree, Math.max(700, 3 * unitMs())); // 間があいたら1文字確定
     spaceTimer = setTimeout(autoSpace, Math.max(2000, 7 * unitMs())); // 長い間でスペース
   } else commitTimer = setTimeout(commit, Math.max(800, 7 * unitMs())); // 無入力が続いたら1文字確定
@@ -252,7 +259,7 @@ function keyUp() {
 
 // ---- フリー打鍵 ----
 function renderFree() {
-  $("tape").textContent = freeText;
+  $("tape").textContent = settings.mode === "flow" ? flowTape() : freeText;
   renderHud();
 }
 
@@ -265,14 +272,16 @@ function commitFree() {
   input = "";
   $("trace").textContent = $("sym").textContent = "";
   renderFree();
+  if (settings.mode === "flow") flowCheck();
 }
 
 function autoSpace() {
-  if (freeText && !freeText.endsWith(" ")) { freeText += " "; renderFree(); }
+  if (settings.mode !== "flow" && freeText && !freeText.endsWith(" ")) { freeText += " "; renderFree(); }
 }
 
 // 入力中の符号があれば破棄、なければ最後の1文字を消す
 function freeBack() {
+  if (flowLocked()) return;
   clearTimeout(commitTimer);
   clearTimeout(spaceTimer);
   if (input) { input = ""; clearTree(); $("trace").textContent = $("sym").textContent = ""; }
@@ -281,6 +290,7 @@ function freeBack() {
 }
 
 function freeSpace() {
+  if (flowLocked()) return;
   clearTimeout(commitTimer);
   clearTimeout(spaceTimer);
   commitFree();
@@ -288,6 +298,7 @@ function freeSpace() {
 }
 
 function freeClear() {
+  if (flowLocked()) return;
   clearTimeout(commitTimer);
   clearTimeout(spaceTimer);
   input = freeText = "";
@@ -317,10 +328,10 @@ keyBtn.addEventListener("pointerup", keyUp);
 keyBtn.addEventListener("pointercancel", keyUp);
 keyBtn.addEventListener("contextmenu", (e) => e.preventDefault());
 const isSpace = (e) => e.code === "Space" && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName);
-const isKeyMode = () => settings.mode === "key" || settings.mode === "free";
+const isKeyMode = () => ["key", "free", "flow"].includes(settings.mode);
 document.addEventListener("keydown", (e) => {
   if (isSpace(e) && isKeyMode()) { e.preventDefault(); if (!e.repeat) keyDown(); }
-  else if (e.code === "Backspace" && settings.mode === "free" && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); freeBack(); }
+  else if (e.code === "Backspace" && (settings.mode === "free" || settings.mode === "flow") && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); freeBack(); }
 });
 document.addEventListener("keyup", (e) => { if (isSpace(e) && isKeyMode()) { e.preventDefault(); keyUp(); } });
 $("keyClear").addEventListener("click", clearInput);
@@ -331,9 +342,9 @@ $("fClear").addEventListener("click", freeClear);
 // ---- 聞き取り上級(MUSE): フレーズを順番に再生 ----
 const museLast = MUSE_PHRASES.length - 1;
 
-function museStop() { // 再生・待機中のタイマーと音をすべて止める
-  museTok++;
-  clearTimeout(museTimer);
+function stopPlay() { // 再生・待機中のタイマーと音をすべて止める
+  playTok++;
+  clearTimeout(playTimer);
   player.stop();
 }
 
@@ -347,35 +358,38 @@ function museSetIndex(i) {
   log.scrollTop = log.scrollHeight;
 }
 
+// フレーズ再生中、要素ごとにツリーを点灯(MUSE/FLOW共通)
+const phraseLamp = (text, tok, vis) => (ci, k, sym, state) => {
+  if (tok !== playTok || !vis) return;
+  const code = MORSE[text[ci]];
+  if (state === "on") {
+    if (k === 0) clearTree();
+    lightPath(code, k + 1, true);
+    $("sym").textContent = sym === "." ? "ト dit" : "ツー dah";
+  } else {
+    els[code.slice(0, k + 1)].node.classList.remove("now");
+    $("sym").textContent = "";
+  }
+};
+
 function musePlay() {
-  const tok = ++museTok, i = settings.museIndex, text = MUSE_PHRASES[i];
-  clearTimeout(museTimer);
+  const tok = ++playTok, i = settings.museIndex, text = MUSE_PHRASES[i];
+  clearTimeout(playTimer);
   const vis = settings.visual, tape = $("tape");
   tape.textContent = $("result").textContent = $("trace").textContent = $("sym").textContent = "";
   clearTree();
-  player.playText(text, settings, (ci, k, sym, state) => {
-    if (tok !== museTok || !vis) return;
-    const code = MORSE[text[ci]];
-    if (state === "on") {
-      if (k === 0) clearTree();
-      lightPath(code, k + 1, true);
-      $("sym").textContent = sym === "." ? "ト dit" : "ツー dah";
-    } else {
-      els[code.slice(0, k + 1)].node.classList.remove("now");
-      $("sym").textContent = "";
-    }
-  }, (ci) => { if (tok === museTok && vis) tape.textContent = text.slice(0, ci + 1); }, () => {
-    if (tok !== museTok) return;
+  player.playText(text, settings, phraseLamp(text, tok, vis), (ci) => { if (tok === playTok && vis) tape.textContent = text.slice(0, ci + 1); }, () => {
+    if (tok !== playTok) return;
     tape.textContent = text;
     $("trace").textContent = $("sym").textContent = "";
     clearTree();
     if (i === museLast) { $("result").textContent = "おわり — 最初から聞くには「次」\nThe end — press Next to start over"; return; }
-    museTimer = setTimeout(() => { if (tok === museTok) museGo(i + 1); }, Math.max(2500, 14 * unitMs())); // 一息おいて次へ
+    playTimer = setTimeout(() => { if (tok === playTok) museGo(i + 1); }, Math.max(2500, 14 * unitMs())); // 一息おいて次へ
   });
 }
 
 function museGo(i) {
-  museStop();
+  stopPlay();
   musePaused = false;
   $("pause").innerHTML = '一時停止<span class="en">Pause</span>';
   $("start").hidden = true;
@@ -385,19 +399,87 @@ function museGo(i) {
 
 function musePause() {
   if (musePaused) { musePaused = false; $("pause").innerHTML = '一時停止<span class="en">Pause</span>'; musePlay(); return; }
-  museStop();
+  stopPlay();
   musePaused = true;
   $("pause").innerHTML = '再開<span class="en">Resume</span>';
 }
 
+// ---- 聞き取り中級(FLOW): フレーズを聞いて打鍵で再現 ----
+const flowLast = FLOW_PHRASES.length - 1;
+const FLOW_HINT = "フレーズを聞いて、打鍵で再現しよう\nListen, then key the phrase back";
+const flowLocked = () => settings.mode === "flow" && answered; // 判定後は次へ進むまで入力不可
+const noSp = (t) => t.replace(/ /g, "");
+
+// マスクの文字位置に入力済みの文字を順に埋める(はみ出しは末尾に追加)。語間のスペースは維持
+function flowFill() {
+  const t = [...noSp(freeText)];
+  let k = 0;
+  return [...current].map((c) => (c === " " ? " " : t[k++] || "_")).join("") + t.slice(k).join("");
+}
+const flowTape = () => (!current ? "" : answered ? current : flowFill()); // 判定前に答えは出さない
+
+function releaseKey() {
+  if (!pressAt) return;
+  pressAt = 0;
+  player.toneOff();
+  $("key").classList.remove("down");
+}
+
+function flowPlay() {
+  stopPlay();
+  releaseKey();
+  clearTimeout(commitTimer); // 入力途中の符号は破棄(確定済みの文字は残す)
+  clearTimeout(spaceTimer);
+  input = "";
+  const tok = playTok, text = current;
+  playing = true;
+  $("play").disabled = true;
+  $("trace").textContent = $("sym").textContent = "";
+  clearTree();
+  renderFree();
+  player.playText(text, settings, phraseLamp(text, tok, settings.visual), () => {}, () => {
+    if (tok !== playTok) return;
+    playing = false;
+    $("play").disabled = false;
+    $("trace").textContent = $("sym").textContent = "";
+    clearTree();
+  });
+}
+
+function flowGo(i) {
+  stopPlay();
+  if (i !== settings.flowIndex) { settings.flowIndex = i; save(); }
+  current = FLOW_PHRASES[i];
+  answered = false;
+  freeText = "";
+  $("start").hidden = true;
+  $("result").textContent = "";
+  $("hint").textContent = FLOW_HINT;
+  $("lampOk").className = $("lampNg").className = "lamp";
+  flowPlay();
+}
+
+// 入力文字数(スペース除く)がフレーズに達したら判定
+function flowCheck() {
+  if (answered || noSp(freeText).length < noSp(current).length) return;
+  clearTimeout(commitTimer);
+  clearTimeout(spaceTimer);
+  const ok = noSp(freeText) === noSp(current);
+  const typed = flowFill();
+  score(ok);
+  clearTree();
+  $("trace").textContent = $("sym").textContent = "";
+  $("hint").textContent = ok ? "" : `入力 You: ${typed}`;
+  renderFree();
+}
 
 // ---- モード切替・設定 ----
 function resetSession() {
   player.stop();
-  museStop();
+  stopPlay();
   musePaused = false;
   clearTimeout(spaceTimer);
-  if (pressAt) { pressAt = 0; player.toneOff(); $("key").classList.remove("down"); }
+  releaseKey();
   playing = false;
   $("play").disabled = false;
   renderKeys();
@@ -412,27 +494,29 @@ function resetSession() {
   $("lampOk").className = $("lampNg").className = "lamp";
   $("next").hidden = true;
   renderHud();
-  const m = settings.mode, key = m === "key", free = m === "free", muse = m === "muse";
-  $("keys").hidden = key || free || muse;
-  $("keyPad").hidden = !(key || free);
-  $("keyClear").hidden = free;
-  $("freeBtns").hidden = !free;
+  const m = settings.mode, key = m === "key", free = m === "free", muse = m === "muse", flow = m === "flow";
+  if (flow) freeText = "";
+  const pi = muse ? settings.museIndex : settings.flowIndex;
+  $("keys").hidden = key || free || muse || flow;
+  $("keyPad").hidden = !(key || free || flow);
+  $("keyClear").hidden = free || flow;
+  $("freeBtns").hidden = !(free || flow);
   $("start").hidden = key || free;
-  $("start").innerHTML = muse && settings.museIndex > 0 ? `続きから #${settings.museIndex + 1}<span class="en">Resume</span>` : 'スタート<span class="en">Start</span>';
+  $("start").innerHTML = (muse || flow) && pi > 0 ? `続きから #${pi + 1}<span class="en">Resume</span>` : 'スタート<span class="en">Start</span>';
   document.querySelector(".actions").hidden = free;
   $("prev").hidden = $("pause").hidden = !muse;
   $("pause").innerHTML = '一時停止<span class="en">Pause</span>';
   $("play").innerHTML = muse ? 'もう一度<span class="en">Repeat</span>' : key ? 'お手本を聞く<span class="en">Hear model</span>' : 'もう一度聞く<span class="en">Listen again</span>';
   $("next").innerHTML = muse ? '次 ▶<span class="en">Next</span>' : '次へ<span class="en">Next</span>';
-  $("next").hidden = !muse;
+  $("next").hidden = !(muse || flow);
   document.querySelector(".lamps").hidden = free || muse;
-  $("tape").hidden = !(free || muse);
+  $("tape").hidden = !(free || muse || flow);
   $("tape").classList.toggle("cur", free);
   $("tape").textContent = free ? freeText : "";
   $("museLog").hidden = !muse;
   if (muse) museSetIndex(settings.museIndex);
   $("hint").textContent = free ? "自由に打鍵 — 間をあけると文字が確定、長めの間でスペース\nTap freely — pause to commit a letter, longer pause for a space"
-    : muse ? "フレーズを順番に聞き取ります(全100)\nListen to 100 phrases in order" : "";
+    : muse ? "フレーズを順番に聞き取ります(全100)\nListen to 100 phrases in order" : flow ? FLOW_HINT : "";
   for (const k in MODE_BTN) $(MODE_BTN[k]).classList.toggle("on", k === m);
   renderHud();
   if (key) next(); // 打鍵モードはすぐ出題(音は打鍵時に鳴る)
@@ -449,6 +533,7 @@ $("modeListen").addEventListener("click", () => setMode("listen"));
 $("modeKey").addEventListener("click", () => setMode("key"));
 $("modeFree").addEventListener("click", () => setMode("free"));
 $("modeMuse").addEventListener("click", () => setMode("muse"));
+$("modeFlow").addEventListener("click", () => setMode("flow"));
 
 function bindSetting(id, key, parse, labelId, fmt) {
   const el = $(id);
@@ -477,10 +562,10 @@ stepSel.addEventListener("change", () => {
 $("visual").checked = settings.visual;
 $("visual").addEventListener("change", (e) => { settings.visual = e.target.checked; save(); });
 
-$("start").addEventListener("click", () => { $("start").hidden = true; settings.mode === "muse" ? museGo(settings.museIndex) : next(); }); // 音声再生にはユーザー操作が必要
-const isMuse = () => settings.mode === "muse";
-$("play").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex) : play()));
-$("next").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex >= museLast ? 0 : settings.museIndex + 1) : next()));
+const isMuse = () => settings.mode === "muse", isFlow = () => settings.mode === "flow";
+$("start").addEventListener("click", () => { $("start").hidden = true; isMuse() ? museGo(settings.museIndex) : isFlow() ? flowGo(settings.flowIndex) : next(); }); // 音声再生にはユーザー操作が必要
+$("play").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex) : isFlow() ? (current ? flowPlay() : flowGo(settings.flowIndex)) : play()));
+$("next").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex >= museLast ? 0 : settings.museIndex + 1) : isFlow() ? flowGo(settings.flowIndex >= flowLast ? 0 : settings.flowIndex + 1) : next()));
 $("prev").addEventListener("click", () => museGo(Math.max(0, settings.museIndex - 1)));
 $("pause").addEventListener("click", musePause);
 $("reset").addEventListener("click", () => { Object.assign(stats, { correct: 0, total: 0, streak: 0 }); renderStats(); save(); });
