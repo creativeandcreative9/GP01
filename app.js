@@ -568,7 +568,10 @@ $("play").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex)
 $("next").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex >= museLast ? 0 : settings.museIndex + 1) : isFlow() ? flowGo(settings.flowIndex >= flowLast ? 0 : settings.flowIndex + 1) : next()));
 $("prev").addEventListener("click", () => museGo(Math.max(0, settings.museIndex - 1)));
 $("pause").addEventListener("click", musePause);
-$("reset").addEventListener("click", () => { Object.assign(stats, { correct: 0, total: 0, streak: 0 }); renderStats(); save(); });
+$("reset").addEventListener("click", () => {
+  Object.assign(stats, { correct: 0, total: 0, streak: 0 }); renderStats(); save();
+  if (settings.mode === "free") freeClear(); // フリー打鍵の蓄積文字列も消す
+});
 
 buildTree();
 renderStats();
