@@ -21,13 +21,15 @@
   <nav class="modes">
     <button id="modeListen" class="seg on">聞き取り<span class="en">Listen</span></button>
     <button id="modeKey" class="seg">打鍵<span class="en">Keying</span></button>
+    <button id="modeFree" class="seg">フリー打鍵<span class="en">Free</span></button>
+    <button id="modeMuse" class="seg">聞き取り上級<span class="en">Advanced</span></button>
   </nav>
 
   <section class="board">
     <div class="hud">
-      <span>TARGET <b id="target">?</b></span>
+      <span><span id="targetLabel">TARGET</span> <b id="target">?</b></span>
       <span id="trace" class="trace"></span>
-      <span>ATTEMPT <b id="attempt">01</b></span>
+      <span><span id="attemptLabel">ATTEMPT</span> <b id="attempt">01</b></span>
     </div>
     <div class="lamps">
       <div><span id="lampOk" class="lamp"></span>OK</div>
@@ -39,6 +41,7 @@
       </filter></defs>
     </svg>
     <div class="legend"><i class="lg-dot"></i>SHORT 短 · ト dit <i class="lg-dash"></i>LONG 長 · ツー dah</div>
+    <div id="tape" class="tape" hidden></div>
     <div id="sym" class="sym"></div>
     <div id="hint" class="hint"></div>
     <div id="result" class="result" role="status"></div>
@@ -46,7 +49,9 @@
 
   <button id="start" class="primary">スタート<span class="en">Start</span></button>
   <div class="actions">
+    <button id="prev" class="secondary" hidden>◀ 前<span class="en">Prev</span></button>
     <button id="play" class="secondary">もう一度聞く<span class="en">Listen again</span></button>
+    <button id="pause" class="secondary" hidden>一時停止<span class="en">Pause</span></button>
     <button id="next" class="primary" hidden>次へ<span class="en">Next</span></button>
   </div>
 
@@ -55,7 +60,14 @@
   <section id="keyPad" class="keypad" hidden>
     <button id="key" class="keybtn" aria-label="打鍵 Tap key">打鍵 TAP<span class="en">短く=ト dit / 長押し=ツー dah</span></button>
     <button id="keyClear" class="secondary">入力を消す Clear</button>
+    <div id="freeBtns" class="freebtns" hidden>
+      <button id="fSpace" class="secondary">スペース<span class="en">Space</span></button>
+      <button id="fBack" class="secondary">1文字消す<span class="en">Back</span></button>
+      <button id="fClear" class="secondary">全消去<span class="en">Clear all</span></button>
+    </div>
   </section>
+
+  <ol id="museLog" class="muselog" start="1" hidden></ol>
 
   <details>
     <summary>設定 Settings</summary>

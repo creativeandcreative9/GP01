@@ -1,13 +1,17 @@
 import { MORSE, LEARN_ORDER, MorsePlayer } from "./morse.js";
+import { MUSE_PHRASES } from "./muse.js";
 
 const $ = (id) => document.getElementById(id);
 const player = new MorsePlayer();
 // ステップ練習: 各ステップで追加される文字(累積して練習する)
 const STEPS = ["KM", "R", "S", "I", "A", "P", "T", "L", "O"];
-const DEFAULTS = { wpm: 15, freq: 600, level: 6, visual: true, step: 0, mode: "listen" };
+const DEFAULTS = { wpm: 15, freq: 600, level: 6, visual: true, step: 0, mode: "listen", museIndex: 0 };
 const settings = { ...DEFAULTS, ...load("settings") };
 settings.level = Math.min(settings.level, LEARN_ORDER.length);
 if (!(settings.step >= 0 && settings.step <= STEPS.length)) settings.step = 0;
+const MODE_BTN = { listen: "modeListen", key: "modeKey", free: "modeFree", muse: "modeMuse" };
+if (!(settings.mode in MODE_BTN)) settings.mode = "listen";
+settings.museIndex = Math.min(MUSE_PHRASES.length - 1, Math.max(0, Math.floor(+settings.museIndex) || 0));
 const stats = { correct: 0, total: 0, streak: 0, ...load("stats") };
 
 let current = null;   // 出題中の文字
@@ -16,6 +20,11 @@ let answered = false;
 let input = "";       // 打鍵モードの入力中の符号
 let pressAt = 0;      // 打鍵ボタンを押し始めた時刻(0=押していない)
 let commitTimer = null;
+let spaceTimer = null;  // フリー打鍵: 自動スペース用
+let freeText = "";      // フリー打鍵: 確定済みの文字列
+let museTok = 0;        // MUSE: 世代番号(古いタイマー/コールバックを無効化)
+let museTimer = null;
+let musePaused = false;
 
 function load(key) {
   try { return JSON.parse(localStorage.getItem("morse." + key)) || {}; } catch { return {}; }
@@ -39,7 +48,8 @@ const fmtEn = (code) => [...code].map((s) => (s === "." ? "dit" : "dah")).join("
 const SVGNS = "http://www.w3.org/2000/svg";
 const ROW_Y = [14, 72, 130, 188, 246];
 const letterByCode = {};
-for (const [ch, code] of Object.entries(MORSE)) if (/[A-Z]/.test(ch)) letterByCode[code] = ch;
+const charByCode = {}; // 英字+数字の逆引き(フリー打鍵のデコード用)
+for (const [ch, code] of Object.entries(MORSE)) { charByCode[code] = ch; if (/[A-Z]/.test(ch)) letterByCode[code] = ch; }
 const els = {}; // code -> { edge, node }
 
 function svg(tag, attrs, parent) {
@@ -84,8 +94,8 @@ function buildTree() {
 }
 
 function refreshTreeLevel() {
-  const act = new Set(activeChars());
-  for (const code in els) if (els[code].ch) els[code].node.classList.toggle("off", !act.has(els[code].ch));
+  const act = new Set(activeChars()), all = settings.mode === "free" || settings.mode === "muse"; // 全文字を使うモードは減光しない
+  for (const code in els) if (els[code].ch) els[code].node.classList.toggle("off", !all && !act.has(els[code].ch));
 }
 
 function clearTree() {
@@ -108,7 +118,16 @@ function lightPath(code, n, now) {
 }
 
 function renderHud() {
-  $("attempt").textContent = String(stats.total + (answered ? 0 : 1)).padStart(2, "0");
+  const m = settings.mode;
+  $("targetLabel").textContent = m === "free" ? "LAST" : m === "muse" ? "PHRASE" : "TARGET";
+  $("attemptLabel").textContent = m === "free" ? "CHARS" : m === "muse" ? "OF" : "ATTEMPT";
+  if (m === "free") {
+    $("target").textContent = freeText.trim().slice(-1) || "-";
+    $("attempt").textContent = String(freeText.length).padStart(2, "0");
+  } else if (m === "muse") {
+    $("target").textContent = String(settings.museIndex + 1).padStart(2, "0");
+    $("attempt").textContent = MUSE_PHRASES.length;
+  } else $("attempt").textContent = String(stats.total + (answered ? 0 : 1)).padStart(2, "0");
 }
 
 function renderKeys() {
@@ -204,8 +223,11 @@ function answer(ch, btn) {
 const unitMs = () => 1200 / settings.wpm;
 
 function keyDown() {
-  if (settings.mode !== "key" || !current || answered || playing || pressAt) return;
+  const free = settings.mode === "free";
+  if (pressAt || !(free || (settings.mode === "key" && current && !answered && !playing))) return;
   clearTimeout(commitTimer);
+  clearTimeout(spaceTimer);
+  if (free && !input) clearTree(); // 前の文字の点灯を消す
   pressAt = performance.now();
   player.toneOn(settings.freq);
   $("key").classList.add("down");
@@ -222,7 +244,56 @@ function keyUp() {
   lightPath(input, input.length, true);
   $("trace").textContent = fmtSyms(input);
   $("sym").textContent = sym === "." ? "ト dit" : "ツー dah";
-  commitTimer = setTimeout(commit, Math.max(800, 7 * unitMs())); // 無入力が続いたら1文字確定
+  if (settings.mode === "free") {
+    commitTimer = setTimeout(commitFree, Math.max(700, 3 * unitMs())); // 間があいたら1文字確定
+    spaceTimer = setTimeout(autoSpace, Math.max(2000, 7 * unitMs())); // 長い間でスペース
+  } else commitTimer = setTimeout(commit, Math.max(800, 7 * unitMs())); // 無入力が続いたら1文字確定
+}
+
+// ---- フリー打鍵 ----
+function renderFree() {
+  $("tape").textContent = freeText;
+  renderHud();
+}
+
+function commitFree() {
+  if (!input) return;
+  const e = els[input];
+  freeText += charByCode[input] || "?";
+  clearTree();
+  if (e && e.ch) { lightPath(input, input.length, false); e.node.classList.add("target"); }
+  input = "";
+  $("trace").textContent = $("sym").textContent = "";
+  renderFree();
+}
+
+function autoSpace() {
+  if (freeText && !freeText.endsWith(" ")) { freeText += " "; renderFree(); }
+}
+
+// 入力中の符号があれば破棄、なければ最後の1文字を消す
+function freeBack() {
+  clearTimeout(commitTimer);
+  clearTimeout(spaceTimer);
+  if (input) { input = ""; clearTree(); $("trace").textContent = $("sym").textContent = ""; }
+  else freeText = freeText.slice(0, -1);
+  renderFree();
+}
+
+function freeSpace() {
+  clearTimeout(commitTimer);
+  clearTimeout(spaceTimer);
+  commitFree();
+  autoSpace();
+}
+
+function freeClear() {
+  clearTimeout(commitTimer);
+  clearTimeout(spaceTimer);
+  input = freeText = "";
+  clearTree();
+  $("trace").textContent = $("sym").textContent = "";
+  renderFree();
 }
 
 function commit() {
@@ -246,13 +317,87 @@ keyBtn.addEventListener("pointerup", keyUp);
 keyBtn.addEventListener("pointercancel", keyUp);
 keyBtn.addEventListener("contextmenu", (e) => e.preventDefault());
 const isSpace = (e) => e.code === "Space" && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName);
-document.addEventListener("keydown", (e) => { if (isSpace(e) && settings.mode === "key") { e.preventDefault(); if (!e.repeat) keyDown(); } });
-document.addEventListener("keyup", (e) => { if (isSpace(e) && settings.mode === "key") keyUp(); });
+const isKeyMode = () => settings.mode === "key" || settings.mode === "free";
+document.addEventListener("keydown", (e) => {
+  if (isSpace(e) && isKeyMode()) { e.preventDefault(); if (!e.repeat) keyDown(); }
+  else if (e.code === "Backspace" && settings.mode === "free" && !/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) { e.preventDefault(); freeBack(); }
+});
+document.addEventListener("keyup", (e) => { if (isSpace(e) && isKeyMode()) { e.preventDefault(); keyUp(); } });
 $("keyClear").addEventListener("click", clearInput);
+$("fSpace").addEventListener("click", freeSpace);
+$("fBack").addEventListener("click", freeBack);
+$("fClear").addEventListener("click", freeClear);
+
+// ---- 聞き取り上級(MUSE): フレーズを順番に再生 ----
+const museLast = MUSE_PHRASES.length - 1;
+
+function museStop() { // 再生・待機中のタイマーと音をすべて止める
+  museTok++;
+  clearTimeout(museTimer);
+  player.stop();
+}
+
+function museSetIndex(i) {
+  settings.museIndex = i;
+  save();
+  renderHud();
+  const log = $("museLog");
+  log.innerHTML = "";
+  MUSE_PHRASES.slice(0, i).forEach((t) => { const li = document.createElement("li"); li.textContent = t; log.append(li); });
+  log.scrollTop = log.scrollHeight;
+}
+
+function musePlay() {
+  const tok = ++museTok, i = settings.museIndex, text = MUSE_PHRASES[i];
+  clearTimeout(museTimer);
+  const vis = settings.visual, tape = $("tape");
+  tape.textContent = $("result").textContent = $("trace").textContent = $("sym").textContent = "";
+  clearTree();
+  player.playText(text, settings, (ci, k, sym, state) => {
+    if (tok !== museTok || !vis) return;
+    const code = MORSE[text[ci]];
+    if (state === "on") {
+      if (k === 0) clearTree();
+      lightPath(code, k + 1, true);
+      $("sym").textContent = sym === "." ? "ト dit" : "ツー dah";
+    } else {
+      els[code.slice(0, k + 1)].node.classList.remove("now");
+      $("sym").textContent = "";
+    }
+  }, (ci) => { if (tok === museTok && vis) tape.textContent = text.slice(0, ci + 1); }, () => {
+    if (tok !== museTok) return;
+    tape.textContent = text;
+    $("trace").textContent = $("sym").textContent = "";
+    clearTree();
+    if (i === museLast) { $("result").textContent = "おわり — 最初から聞くには「次」\nThe end — press Next to start over"; return; }
+    museTimer = setTimeout(() => { if (tok === museTok) museGo(i + 1); }, Math.max(2500, 14 * unitMs())); // 一息おいて次へ
+  });
+}
+
+function museGo(i) {
+  museStop();
+  musePaused = false;
+  $("pause").innerHTML = '一時停止<span class="en">Pause</span>';
+  $("start").hidden = true;
+  if (i !== settings.museIndex) museSetIndex(i);
+  musePlay();
+}
+
+function musePause() {
+  if (musePaused) { musePaused = false; $("pause").innerHTML = '一時停止<span class="en">Pause</span>'; musePlay(); return; }
+  museStop();
+  musePaused = true;
+  $("pause").innerHTML = '再開<span class="en">Resume</span>';
+}
+
 
 // ---- モード切替・設定 ----
 function resetSession() {
   player.stop();
+  museStop();
+  musePaused = false;
+  clearTimeout(spaceTimer);
+  if (pressAt) { pressAt = 0; player.toneOff(); $("key").classList.remove("down"); }
   playing = false;
   $("play").disabled = false;
   renderKeys();
@@ -267,24 +412,43 @@ function resetSession() {
   $("lampOk").className = $("lampNg").className = "lamp";
   $("next").hidden = true;
   renderHud();
-  const key = settings.mode === "key";
-  $("keys").hidden = key;
-  $("keyPad").hidden = !key;
-  $("start").hidden = key;
-  $("play").innerHTML = key ? 'お手本を聞く<span class="en">Hear model</span>' : 'もう一度聞く<span class="en">Listen again</span>';
-  $("modeListen").classList.toggle("on", !key);
-  $("modeKey").classList.toggle("on", key);
+  const m = settings.mode, key = m === "key", free = m === "free", muse = m === "muse";
+  $("keys").hidden = key || free || muse;
+  $("keyPad").hidden = !(key || free);
+  $("keyClear").hidden = free;
+  $("freeBtns").hidden = !free;
+  $("start").hidden = key || free;
+  $("start").innerHTML = muse && settings.museIndex > 0 ? `続きから #${settings.museIndex + 1}<span class="en">Resume</span>` : 'スタート<span class="en">Start</span>';
+  document.querySelector(".actions").hidden = free;
+  $("prev").hidden = $("pause").hidden = !muse;
+  $("pause").innerHTML = '一時停止<span class="en">Pause</span>';
+  $("play").innerHTML = muse ? 'もう一度<span class="en">Repeat</span>' : key ? 'お手本を聞く<span class="en">Hear model</span>' : 'もう一度聞く<span class="en">Listen again</span>';
+  $("next").innerHTML = muse ? '次 ▶<span class="en">Next</span>' : '次へ<span class="en">Next</span>';
+  $("next").hidden = !muse;
+  document.querySelector(".lamps").hidden = free || muse;
+  $("tape").hidden = !(free || muse);
+  $("tape").classList.toggle("cur", free);
+  $("tape").textContent = free ? freeText : "";
+  $("museLog").hidden = !muse;
+  if (muse) museSetIndex(settings.museIndex);
+  $("hint").textContent = free ? "自由に打鍵 — 間をあけると文字が確定、長めの間でスペース\nTap freely — pause to commit a letter, longer pause for a space"
+    : muse ? "フレーズを順番に聞き取ります(全100)\nListen to 100 phrases in order" : "";
+  for (const k in MODE_BTN) $(MODE_BTN[k]).classList.toggle("on", k === m);
+  renderHud();
   if (key) next(); // 打鍵モードはすぐ出題(音は打鍵時に鳴る)
 }
 
 function setMode(mode) {
   if (settings.mode === mode) return;
   settings.mode = mode;
+  freeText = "";
   save();
   resetSession();
 }
 $("modeListen").addEventListener("click", () => setMode("listen"));
 $("modeKey").addEventListener("click", () => setMode("key"));
+$("modeFree").addEventListener("click", () => setMode("free"));
+$("modeMuse").addEventListener("click", () => setMode("muse"));
 
 function bindSetting(id, key, parse, labelId, fmt) {
   const el = $(id);
@@ -313,9 +477,12 @@ stepSel.addEventListener("change", () => {
 $("visual").checked = settings.visual;
 $("visual").addEventListener("change", (e) => { settings.visual = e.target.checked; save(); });
 
-$("start").addEventListener("click", () => { $("start").hidden = true; next(); }); // 音声再生にはユーザー操作が必要
-$("play").addEventListener("click", play);
-$("next").addEventListener("click", next);
+$("start").addEventListener("click", () => { $("start").hidden = true; settings.mode === "muse" ? museGo(settings.museIndex) : next(); }); // 音声再生にはユーザー操作が必要
+const isMuse = () => settings.mode === "muse";
+$("play").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex) : play()));
+$("next").addEventListener("click", () => (isMuse() ? museGo(settings.museIndex >= museLast ? 0 : settings.museIndex + 1) : next()));
+$("prev").addEventListener("click", () => museGo(Math.max(0, settings.museIndex - 1)));
+$("pause").addEventListener("click", musePause);
 $("reset").addEventListener("click", () => { Object.assign(stats, { correct: 0, total: 0, streak: 0 }); renderStats(); save(); });
 
 buildTree();

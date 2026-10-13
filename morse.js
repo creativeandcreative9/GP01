@@ -12,14 +12,19 @@ export const MORSE = {
 export const LEARN_ORDER = "KMRSUAPTLOWINJEFYVGQZHBXCD".split("");
 
 export class MorsePlayer {
-  constructor() { this.ctx = null; this.timers = []; this.tone = null; }
+  constructor() { this.ctx = null; this.timers = []; this.tone = null; this.live = new Set(); }
 
   ensureContext() {
     if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (this.ctx.state === "suspended") this.ctx.resume();
   }
 
-  stop() { this.timers.forEach(clearTimeout); this.timers = []; }
+  stop() {
+    this.timers.forEach(clearTimeout); this.timers = [];
+    // 予約済みの音も即座に止める
+    for (const { osc, gain } of this.live) { gain.disconnect(); try { osc.stop(); } catch { /* 既に停止 */ } }
+    this.live.clear();
+  }
 
   // 打鍵用: 押している間だけ鳴り続けるトーン
   toneOn(freq) {
@@ -62,6 +67,32 @@ export class MorsePlayer {
     this.timers.push(setTimeout(onDone, (t - start + 0.1) * 1000));
   }
 
+  // 文字列(スペース区切り)を再生。字間3単位・語間7単位。onElement(charIndex, elemIndex, sym, "on"|"off")、onChar(charIndex)、onDone()
+  playText(text, { wpm = 15, freq = 600 }, onElement, onChar, onDone) {
+    this.ensureContext();
+    this.stop();
+    const unit = 1.2 / wpm;
+    let t = this.ctx.currentTime + 0.1;
+    const start = t, at = (x) => (x - start + 0.1) * 1000;
+    let word = false; // 語間(7単位)にするか
+    [...text].forEach((ch, ci) => {
+      if (ch === " ") { word = true; return; }
+      const code = MORSE[ch];
+      if (!code) return;
+      if (t > start) t += (word ? 6 : 2) * unit; // 直前の要素間1単位と合わせて字間3・語間7
+      word = false;
+      [...code].forEach((sym, i) => {
+        const dur = (sym === "." ? 1 : 3) * unit;
+        this.beep(t, dur, freq);
+        this.timers.push(setTimeout(() => onElement(ci, i, sym, "on"), at(t)));
+        this.timers.push(setTimeout(() => onElement(ci, i, sym, "off"), at(t) + dur * 1000));
+        if (i === code.length - 1) this.timers.push(setTimeout(() => onChar(ci), at(t) + dur * 1000));
+        t += dur + unit;
+      });
+    });
+    this.timers.push(setTimeout(onDone, at(t)));
+  }
+
   beep(at, dur, freq) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -73,5 +104,8 @@ export class MorsePlayer {
     osc.connect(gain).connect(this.ctx.destination);
     osc.start(at);
     osc.stop(at + dur + 0.01);
+    const h = { osc, gain };
+    this.live.add(h);
+    osc.onended = () => this.live.delete(h);
   }
 }

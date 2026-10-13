@@ -1,6 +1,6 @@
 // オフライン対応: ネットワーク優先、失敗時にキャッシュ
-const CACHE = "morse-v3";
-const FILES = ["./", "index.html", "style.css", "app.js", "morse.js", "manifest.json", "icons/icon.svg"];
+const CACHE = "morse-v4";
+const FILES = ["./", "index.html", "style.css", "app.js", "morse.js", "muse.js", "manifest.json", "icons/icon.svg"];
 self.addEventListener("install", (e) => {
   self.skipWaiting(); // 新版を待たせず即有効化
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)));

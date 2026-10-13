@@ -53,8 +53,8 @@ h1 .en { font-size:.6em; letter-spacing:.05em; }
 .stats { text-align:right; }
 h1 { white-space:nowrap; font-size:1.05rem; }
 .result { white-space:pre-line; font-size:1.05rem; }
-.modes { display:flex; gap:8px; }
-.seg { flex:1; padding:10px; }
+.modes { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.seg { padding:8px 2px; font-size:.72rem; white-space:nowrap; }
 .seg.on { background:var(--acc); color:#0f172a; font-weight:700; }
 .keypad { display:flex; flex-direction:column; gap:10px; }
 .keybtn { height:140px; font-size:1.6rem; font-weight:700; letter-spacing:.1em; background:linear-gradient(#27415a,#1b2f44);
@@ -64,3 +64,10 @@ h1 { white-space:nowrap; font-size:1.05rem; }
 select { font:inherit; padding:10px; border-radius:8px; background:#0f172a; color:var(--fg); border:1px solid #334155; }
 input[type=range]:disabled { opacity:.35; }
 .hint { white-space:pre-line; }
+.tape { font:600 1.4rem ui-monospace,monospace; letter-spacing:.1em; word-break:break-all; white-space:pre-wrap; min-height:2.8em; text-align:left; padding:6px 10px; color:var(--fg); }
+.tape.cur::after { content:"▍"; color:var(--acc); animation:blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.freebtns { display:flex; gap:8px; } .freebtns button { flex:1; padding:10px 4px; }
+.actions button { padding-left:4px; padding-right:4px; }
+.muselog { max-height:9em; overflow:auto; margin:0; padding:8px 8px 8px 36px; font-size:.8rem; color:var(--mute); background:var(--card); border-radius:12px; }
+.muselog:empty { display:none; }
